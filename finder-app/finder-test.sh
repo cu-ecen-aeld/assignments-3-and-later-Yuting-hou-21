@@ -26,12 +26,11 @@ else
 fi
 
 MATCHSTR="The number of files are ${NUMFILES} and the number of matching lines are ${NUMFILES}"
+#echo "Cleaning previous build artifacts"
+#make clean
 
-echo "Cleaning previous build artifacts"
-make clean
-
-echo "Compiling writer application"
-make
+#echo "Compiling writer application"
+#make
 
 echo "Writing ${NUMFILES} files containing string ${WRITESTR} to ${WRITEDIR}"
 
