@@ -1,78 +1,47 @@
 #!/bin/sh
-# Tester script for assignment 1 and assignment 2
+# Tester script for AESD Assignment 4
 # Author: Siddhant Jajoo
 
 set -e
-set -u
 
-NUMFILES=10
-WRITESTR=AELD_IS_FUN
-WRITEDIR=/tmp/aeld-data
-username=$(cat conf/username.txt)
+# Verify executables in PATH
+command -v writer >/dev/null 2>&1 || { echo "writer not found in PATH"; exit 1; }
+command -v finder.sh >/dev/null 2>&1 || { echo "finder.sh not found in PATH"; exit 1; }
 
-if [ $# -lt 3 ]
-then
-	echo "Using default value ${WRITESTR} for string to write"
-	if [ $# -lt 1 ]
-	then
-		echo "Using default value ${NUMFILES} for number of files to write"
-	else
-		NUMFILES=$1
-	fi	
-else
-	NUMFILES=$1
-	WRITESTR=$2
-	WRITEDIR=/tmp/aeld-data/$3
+# Config files
+CONF_DIR=/etc/finder-app/conf
+USERNAME_FILE=${CONF_DIR}/username.txt
+ASSIGNMENT_FILE=${CONF_DIR}/assignment.txt
+
+[ -f "${USERNAME_FILE}" ] || { echo "username.txt not found in ${CONF_DIR}"; exit 1; }
+[ -f "${ASSIGNMENT_FILE}" ] || { echo "assignment.txt not found in ${CONF_DIR}"; exit 1; }
+
+# Read username
+username=$(cat "${USERNAME_FILE}")
+
+# Test writer
+TEST_DIR=/tmp/aeld-data
+TEST_FILE=${TEST_DIR}/${username}.txt
+TEST_STRING="AESD Assignment 4 Test"
+mkdir -p "${TEST_DIR}"
+writer "${TEST_FILE}" "${TEST_STRING}"
+[ -f "${TEST_FILE}" ] || { echo "writer failed to create ${TEST_FILE}"; exit 1; }
+grep -q "${TEST_STRING}" "${TEST_FILE}" || { echo "writer content mismatch in ${TEST_FILE}"; exit 1; }
+
+# Test finder.sh
+OUTPUT=/tmp/assignment4-result.txt
+finder.sh "${TEST_DIR}" "${TEST_STRING}" > "${OUTPUT}"
+[ -f "${OUTPUT}" ] || { echo "finder.sh failed to create ${OUTPUT}"; exit 1; }
+
+# Verify finder.sh output
+MATCHSTR="The number of files are 1 and the number of matching lines are 1"
+grep -q "${MATCHSTR}" "${OUTPUT}" || { echo "finder.sh output mismatch, expected ${MATCHSTR}"; exit 1; }
+
+# Check syslog for writer messages
+if ! grep -q "writer" /var/log/messages; then
+    echo "No writer messages found in /var/log/messages"
+    exit 1
 fi
 
-MATCHSTR="The number of files are ${NUMFILES} and the number of matching lines are ${NUMFILES}"
-#echo "Cleaning previous build artifacts"
-#make clean
-
-#echo "Compiling writer application"
-#make
-
-echo "Writing ${NUMFILES} files containing string ${WRITESTR} to ${WRITEDIR}"
-
-rm -rf "${WRITEDIR}"
-
-# create $WRITEDIR if not assignment1
-assignment=`cat ../conf/assignment.txt`
-
-if [ $assignment != 'assignment1' ]
-then
-	mkdir -p "$WRITEDIR"
-
-	#The WRITEDIR is in quotes because if the directory path consists of spaces, then variable substitution will consider it as multiple argument.
-	#The quotes signify that the entire string in WRITEDIR is a single string.
-	#This issue can also be resolved by using double square brackets i.e [[ ]] instead of using quotes.
-	if [ -d "$WRITEDIR" ]
-	then
-		echo "$WRITEDIR created"
-	else
-		exit 1
-	fi
-fi
-#echo "Removing the old writer utility and compiling as a native application"
-#make clean
-#make
-
-for i in $( seq 1 $NUMFILES)
-do
-	./writer "$WRITEDIR/${username}$i.txt" "$WRITESTR"
-done
-
-OUTPUTSTRING=$(./finder.sh "$WRITEDIR" "$WRITESTR")
-
-# remove temporary directories
-rm -rf /tmp/aeld-data
-
-set +e
-echo ${OUTPUTSTRING} | grep "${MATCHSTR}"
-if [ $? -eq 0 ]; then
-	echo "success"
-	exit 0
-else
-	echo "failed: expected  ${MATCHSTR} in ${OUTPUTSTRING} but instead found"
-	exit 1
-fi
+echo "All tests passed!"
+exit 0
